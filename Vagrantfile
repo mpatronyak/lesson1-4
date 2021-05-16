@@ -94,16 +94,12 @@ config.vm.define "server" do |server|
       create_disks(vbx, name)
     end
 
-
+  server.vm.provision "shell", path: "enabling_ssh_passauth.sh"
   server.vm.provision "shell",
     name: "Setup zfs",
     path: "setup_zfs.sh"
   end
 
-
-# Cent OS 8.2
-# config used from this
-# https://github.com/eoli3n/vagrant-pxe/blob/master/client/Vagrantfile
   config.vm.define "client" do |client|
     client.vm.box = 'centos/8.2'
     client.vm.host_name = 'client'
@@ -112,6 +108,10 @@ config.vm.define "server" do |server|
       vb.memory = "1024"
       vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     end
+  client.vm.provision "shell", path: "enabling_ssh_passauth.sh"
+  client.vm.provision "shell",
+    name: "Setup zfs",
+    path: "setup_zfs.sh"
   end
 
 end
