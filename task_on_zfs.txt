@@ -1,0 +1,252 @@
+
+_____________________________________________________________________________________________________________________________
+
+
+Задание 1:
+lsblk
+NAME   MAJ:MIN RM SIZE RO TYPE MOUNTPOINT
+sda      8:0    0  10G  0 disk 
+`-sda1   8:1    0  10G  0 part /
+sdb      8:16   0   1G  0 disk 
+sdc      8:32   0   1G  0 disk 
+sdd      8:48   0   1G  0 disk 
+sde      8:64   0   1G  0 disk 
+sdf      8:80   0   1G  0 disk 
+sdg      8:96   0   1G  0 disk
+
+echo disk{1..6} | xargs -n 1 fallocate   -l 500M                - создайем файлы-диски по 500М
+ls disk*                                                        - вывод списка созданных файлов
+disk1  disk2  disk3  disk4  disk5  disk6
+zpool create hybrid mirror $PWD/disk[12] mirror $PWD/disk[34]   - создает пул hybrid типа raid1 из двух пар дисков 1,2 и 3,4
+zpool status                                                    - вывод состояния пула hybrid
+pool: hybrid
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME             STATE     READ WRITE CKSUM
+        hybrid           ONLINE       0     0     0
+          mirror-0       ONLINE       0     0     0
+            /root/disk1  ONLINE       0     0     0
+            /root/disk2  ONLINE       0     0     0
+          mirror-1       ONLINE       0     0     0
+            /root/disk3  ONLINE       0     0     0
+            /root/disk4  ONLINE       0     0     0
+            
+zfs create hybrid/lzjb                                            - создаем файловую систему одноименную с типом сжатия lzjb (она используется по-умолчанию)
+zfs create hybrid/gzip                                            - создаем файловую систему одноименную с типом сжатия gzip
+zfs create hybrid/gzip-9                                          - создаем файловую систему одноименную с типом сжатия gzip-9
+zfs create hybrid/lz4                                             - создаем файловую систему одноименную с типом сжатия lz4
+zfs create hybrid/zle                                             - создаем файловую систему одноименную с типом сжатия zle
+
+zfs list                                                          - выводит список файловых систем и их точек монтирования
+NAME            USED  AVAIL     REFER  MOUNTPOINT
+hybrid          240K   832M       28K  /hybrid
+hybrid/gzip      24K   832M       24K  /hybrid/gzip
+hybrid/gzip-9    24K   832M       24K  /hybrid/gzip-9
+hybrid/lz4       24K   832M       24K  /hybrid/lz4
+hybrid/lzjb      24K   832M       24K  /hybrid/lzjb
+hybrid/zle       24K   832M       24K  /hybrid/zle
+
+zfs set compression=lzjb hybrid/lzjb                              - задаем тип сжатия lzjb для файловой системы hybrid/lzjb
+zfs set compression=gzip hybrid/gzip                              - задаем тип сжатия lzjb для файловой системы gzip
+zfs set compression=gzip-9 hybrid/gzip-9                          - задаем тип сжатия lzjb для файловой системы gzip-9 
+zfs set compression=lz4 hybrid/lz4                                - задаем тип сжатия lzjb для файловой системы lz4
+zfs set compression=zle hybrid/zle                                - задаем тип сжатия lzjb для файловой системы zle
+
+zfs get compression                                              - вывод списка файловых систем и их типов сжатия
+
+curl -o "War_and_Peace.txt" -J -L https://www.gutenberg.org/cache/epub/2600/pg2600.txt  - скачаем файл "War_and_Peace.txt" по предложенной ссылке
+ % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 1181k  100 1181k    0     0   402k      0  0:00:02  0:00:02 --:--:--  402k
+
+xargs -n 1 cp -v War_and_Peace.txt<<<"/hybrid/gzip /hybrid/gzip-9 /hybrid/lz4 /hybrid/lzjb /hybrid/zle"  - копируем скаченный файл в наши файловые системы 
+'War_and_Peace.txt' -> '/hybrid/gzip/War_and_Peace.txt'
+'War_and_Peace.txt' -> '/hybrid/gzip-9/War_and_Peace.txt'
+'War_and_Peace.txt' -> '/hybrid/lz4/War_and_Peace.txt'
+'War_and_Peace.txt' -> '/hybrid/lzjb/War_and_Peace.txt'
+'War_and_Peace.txt' -> '/hybrid/zle/War_and_Peace.txt'
+
+zfs get compression,compressratio                                  - вывод списка файловых систем и их коэффициент сжатия. 
+
+NAME           PROPERTY       VALUE  SOURCE
+hybrid         compressratio  1.08x  -
+hybrid/gzip    compressratio  1.08x  -
+hybrid/gzip-9  compressratio  1.08x  -      
+hybrid/lz4     compressratio  1.08x  -
+hybrid/lzjb    compressratio  1.07x  -      Самый маленький коэффициент сжатия, но высокая скорость работы.
+hybrid/zle     compressratio  1.08x  -                       
+________________________________________________________________________________________________________________________________________________________
+
+
+Задание 2:
+
+Скачиваю файл zfs_task1.tar.gz по ссылке https://drive.google.com/open?id=1KRBNW33QWqbvbVHa3hLJivOAt60yukkg на хостовоую машину:
+   ~/Загрузки  ll | grep zfs
+-rw-r--r-- 1 mpatronyak mpatronyak 7,0M май 15 19:03 zfs_task1.tar.gz
+
+scp ~/Загрузки/zfs_task1.tar.gz vagrant@10.0.0.41:         - Копирую файл на ВМ server
+
+tar xvzf zfs_task1.tar.gz                                  - рапаковываем архив
+zpoolexport/
+zpoolexport/filea
+zpoolexport/fileb
+
+zpool import -d /zpoolexport/         - выводит информацию о пуле для импорта
+pool: otus
+     id: 6554193320433390805
+  state: ONLINE
+ action: The pool can be imported using its name or numeric identifier.
+ config:
+
+        otus                    ONLINE
+          mirror-0              ONLINE
+            /zpoolexport/filea  ONLINE
+            /zpoolexport/fileb  ONLINE
+zpool import -d /zpoolexport/ otus    - импортирует в пул "otus"
+zpool status                          - тип пула
+
+pool: hybrid
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME             STATE     READ WRITE CKSUM
+        hybrid           ONLINE       0     0     0
+          mirror-0       ONLINE       0     0     0
+            /root/disk1  ONLINE       0     0     0
+            /root/disk2  ONLINE       0     0     0
+          mirror-1       ONLINE       0     0     0
+            /root/disk3  ONLINE       0     0     0
+            /root/disk4  ONLINE       0     0     0
+
+errors: No known data errors
+
+  pool: otus   <----------------------------------------------Название добавленного пула
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME                    STATE     READ WRITE CKSUM
+        otus                    ONLINE       0     0     0
+          mirror-0              ONLINE       0     0     0
+            /zpoolexport/filea  ONLINE       0     0     0
+            /zpoolexport/fileb  ONLINE       0     0     0
+
+errors: No known data errors
+zfs get checksum                      - показывает, какая используется контрольная сумма 
+NAME            PROPERTY  VALUE      SOURCE
+hybrid          checksum  on         default
+hybrid/gzip     checksum  on         default
+hybrid/gzip-9   checksum  on         default
+hybrid/lz4      checksum  on         default
+hybrid/lzjb     checksum  on         default
+hybrid/zle      checksum  on         default
+otus            checksum  sha256     local                        - используется контрольная сумма sha256
+otus/hometask2  checksum  sha256     inherited from otus          - используется контрольная сумма sha256
+
+zpool list otus                       - показывает размер хранилища и дедупликацию    (так же можно использовать zpool iostat  )
+NAME   SIZE  ALLOC   FREE  CKPOINT  EXPANDSZ   FRAG    CAP  DEDUP    HEALTH  ALTROOT
+otus   480M  2.09M   478M        -         -     0%     0%  1.00x    ONLINE  -                - размер пула 480М
+
+zfs get recordsize                    - показывает размер блока
+NAME            PROPERTY    VALUE    SOURCE
+hybrid          recordsize  128K     default
+hybrid/gzip     recordsize  128K     default
+hybrid/gzip-9   recordsize  128K     default
+hybrid/lz4      recordsize  128K     default
+hybrid/lzjb     recordsize  128K     default
+hybrid/zle      recordsize  128K     default
+otus            recordsize  128K     local
+otus/hometask2  recordsize  128K     inherited from otus                                      - размер блока 128К
+
+
+zfs get compression,compressratio     - показывает тип сжатия и коэффициент сжатия
+NAME            PROPERTY       VALUE     SOURCE
+hybrid          compression    off       default
+hybrid          compressratio  1.08x     -
+hybrid/gzip     compression    gzip      local
+hybrid/gzip     compressratio  1.08x     -
+hybrid/gzip-9   compression    gzip-9    local
+hybrid/gzip-9   compressratio  1.08x     -
+hybrid/lz4      compression    lz4       local
+hybrid/lz4      compressratio  1.08x     -
+hybrid/lzjb     compression    lzjb      local
+hybrid/lzjb     compressratio  1.07x     -
+hybrid/zle      compression    zle       local
+hybrid/zle      compressratio  1.08x     -
+otus            compression    zle       local                         - используется сжатие zle
+otus            compressratio  1.00x     -
+otus/hometask2  compression    zle       inherited from otus
+otus/hometask2  compressratio  1.00x     -
+
+
+sudo zfs get all otus/hometask2                                        - все текущие параметры для файловой системы или пула
+________________________________________________________________________________________________________________________________________
+
+
+Задание 3:
+
+
+lsblk                                                                  - доступные диски
+NAME   MAJ:MIN RM SIZE RO TYPE MOUNTPOINT
+sda      8:0    0  10G  0 disk 
+`-sda1   8:1    0  10G  0 part /
+sdb      8:16   0   1G  0 disk 
+sdc      8:32   0   1G  0 disk 
+sdd      8:48   0   1G  0 disk 
+sde      8:64   0   1G  0 disk 
+sdf      8:80   0   1G  0 disk 
+sdg      8:96   0   1G  0 disk
+
+zpool create hybrid mirror /dev/sd[bc] mirror /dev/sd[de]               - создаем пул hybrid на raid1 из двух пар дисков
+
+zpool status                                                            - статус созданного пула
+  pool: hybrid
+ state: ONLINE
+  scan: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        hybrid      ONLINE       0     0     0
+          mirror-0  ONLINE       0     0     0
+            sdb     ONLINE       0     0     0
+            sdc     ONLINE       0     0     0
+          mirror-1  ONLINE       0     0     0
+            sdd     ONLINE       0     0     0
+            sde     ONLINE       0     0     0
+            
+zfs create hybrid/data                                                  - создаем еще файловую систему  hybrid/data 
+
+zfs list                                                                - информация о доступных файловых системах
+NAME          USED  AVAIL     REFER  MOUNTPOINT
+hybrid        130K  1.75G     25.5K  /hybrid
+hybrid/data    24K  1.75G       24K  /hybrid/data
+
+zfs receive hybrid/data/secret_message < /vagrant/otus_task2.file        - восстанавливаем из скаченного снепшота файловую систему в наш пул
+
+zfs list                                                                 - как видим, успешно добавлена еще одна файловая истема 
+NAME                         USED  AVAIL     REFER  MOUNTPOINT
+hybrid                      3.89M  1.75G     25.5K  /hybrid
+hybrid/data                 3.72M  1.75G     25.5K  /hybrid/data
+hybrid/data/secret_message  3.69M  1.75G     3.69M  /hybrid/data/secret_message
+
+ls -la  /hybrid/data/secret_message/                                     - смотрим список фалов содержащихся в hybrid/data/secret_message
+total 3473
+drwxr-xr-x. 3 root    root         11 May 15  2020 .
+drwxr-xr-x. 3 root    root          3 May 20 20:21 ..
+-rw-r--r--. 1 root    root          0 May 15  2020 10M.file
+-rw-r--r--. 1 root    root     309987 May 15  2020 Limbo.txt
+-rw-r--r--. 1 root    root     509836 May 15  2020 Moby_Dick.txt
+-rw-r--r--. 1 root    root    1209374 May  6  2016 War_and_Peace.txt
+-rw-r--r--. 1 root    root     727040 May 15  2020 cinderella.tar
+-rw-r--r--. 1 root    root         65 May 15  2020 for_examaple.txt
+-rw-r--r--. 1 root    root          0 May 15  2020 homework4.txt
+drwxr-xr-x. 3 vagrant vagrant       4 Dec 18  2017 task1         <----------далее смотрим содержание этого каталога
+-rw-r--r--. 1 root    root     398635 May 15  2020 world.sql
+
+cat /hybrid/data/secret_message/task1/file_mess/secret_message        -  и в конце концов находим секретный файл со ссылкой на репозиторий github
+https://github.com/sindresorhus/awesome
+
+
